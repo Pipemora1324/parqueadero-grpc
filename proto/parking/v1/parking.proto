@@ -1,0 +1,123 @@
+// =============================================================================
+// CONTRATO DEL MICROSERVICIO DE PARQUEADERO (Contract-First)
+// -----------------------------------------------------------------------------
+// Expone FUNCIONES remotas (no recursos REST): registrar ingreso, registrar
+// salida, listar celdas y observar las celdas en tiempo real (streaming).
+// =============================================================================
+syntax = "proto3";
+
+package parking.v1;
+
+import "billing/v1/billing.proto";
+import "google/protobuf/timestamp.proto";
+
+// Estado de una celda (puesto) del parqueadero.
+enum SpotStatus {
+  SPOT_STATUS_UNSPECIFIED = 0;
+  SPOT_STATUS_AVAILABLE = 1;
+  SPOT_STATUS_OCCUPIED = 2;
+}
+
+// Una celda física del parqueadero.
+message Spot {
+  // Código de la celda, ej: "A-01" (carros) o "M-03" (motos).
+  string id = 1;
+  billing.v1.VehicleType allowed_type = 2;
+  SpotStatus status = 3;
+  // Datos del vehículo que la ocupa (vacíos si está libre).
+  string plate = 4;
+  string ticket_id = 5;
+  google.protobuf.Timestamp occupied_since = 6;
+}
+
+// Ticket que se entrega al ingresar.
+message Ticket {
+  string id = 1;
+  string plate = 2;
+  billing.v1.VehicleType vehicle_type = 3;
+  string spot_id = 4;
+  google.protobuf.Timestamp entered_at = 5;
+}
+
+// Recibo que se genera al salir.
+message Receipt {
+  string ticket_id = 1;
+  string plate = 2;
+  billing.v1.VehicleType vehicle_type = 3;
+  string spot_id = 4;
+  google.protobuf.Timestamp entered_at = 5;
+  google.protobuf.Timestamp exited_at = 6;
+  uint32 total_minutes = 7;
+  uint32 billable_minutes = 8;
+  uint32 price_per_minute = 9;
+  uint32 total_amount = 10;
+  string breakdown = 11;
+}
+
+// Indicadores generales del parqueadero.
+message ParkingSummary {
+  uint32 total_spots = 1;
+  uint32 available_spots = 2;
+  uint32 occupied_spots = 3;
+  uint32 available_car_spots = 4;
+  uint32 available_motorcycle_spots = 5;
+  // Dinero recaudado desde que arrancó el servicio (COP).
+  uint32 revenue = 6;
+  uint32 completed_exits = 7;
+}
+
+message RegisterEntryRequest {
+  string plate = 1;
+  billing.v1.VehicleType vehicle_type = 2;
+}
+
+message RegisterEntryResponse {
+  Ticket ticket = 1;
+}
+
+message RegisterExitRequest {
+  string plate = 1;
+}
+
+message RegisterExitResponse {
+  Receipt receipt = 1;
+}
+
+message ListSpotsRequest {}
+
+message ListSpotsResponse {
+  repeated Spot spots = 1;
+  ParkingSummary summary = 2;
+}
+
+message ListReceiptsRequest {
+  // Cantidad máxima de recibos a devolver (por defecto 10).
+  uint32 limit = 1;
+}
+
+message ListReceiptsResponse {
+  repeated Receipt receipts = 1;
+}
+
+message WatchSpotsRequest {}
+
+// Evento que viaja por el stream cada vez que cambia el parqueadero.
+message WatchSpotsResponse {
+  repeated Spot spots = 1;
+  ParkingSummary summary = 2;
+  // Descripción del evento que provocó el cambio.
+  string event = 3;
+}
+
+service ParkingService {
+  // Unary: asigna automáticamente una celda libre y emite un ticket.
+  rpc RegisterEntry(RegisterEntryRequest) returns (RegisterEntryResponse);
+  // Unary: calcula la tarifa (llamando a BillingService) y libera la celda.
+  rpc RegisterExit(RegisterExitRequest) returns (RegisterExitResponse);
+  // Unary: estado actual de todas las celdas.
+  rpc ListSpots(ListSpotsRequest) returns (ListSpotsResponse);
+  // Unary: últimos recibos emitidos.
+  rpc ListReceipts(ListReceiptsRequest) returns (ListReceiptsResponse);
+  // Server streaming: empuja el estado de las celdas en tiempo real.
+  rpc WatchSpots(WatchSpotsRequest) returns (stream WatchSpotsResponse);
+}

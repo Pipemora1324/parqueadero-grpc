@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ParkGrid · Parqueadero gRPC</title>
+  <meta name="description" content="Gestión de parqueadero en tiempo real construida con gRPC, Protobuf y microservicios." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23FFD23F'/><text x='16' y='23' font-family='Arial' font-weight='900' font-size='20' text-anchor='middle' fill='%23111'>P</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="glow glow--one"></div>
+  <div class="glow glow--two"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand__sign">P</div>
+      <div>
+        <h1 class="brand__name">ParkGrid</h1>
+        <p class="brand__tag">Gestión de parqueadero · gRPC + Protobuf</p>
+      </div>
+    </div>
+    <div class="topbar__right">
+      <span class="clock" id="clock">--:--:--</span>
+      <span class="live" id="live-status" data-state="connecting">
+        <span class="live__dot"></span>
+        <span class="live__text">Conectando stream…</span>
+      </span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Indicadores -->
+    <section class="kpis" aria-label="Indicadores">
+      <article class="kpi kpi--ring">
+        <svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ring__track" cx="60" cy="60" r="50" />
+          <circle class="ring__bar" id="ring-bar" cx="60" cy="60" r="50" />
+        </svg>
+        <div class="ring__label"><strong id="kpi-occupancy">0%</strong><span>ocupación</span></div>
+        <div class="kpi__side">
+          <span class="kpi__title">Celdas ocupadas</span>
+          <span class="kpi__value" id="kpi-occupied">0</span>
+          <span class="kpi__hint" id="kpi-total">de 0 celdas</span>
+        </div>
+      </article>
+      <article class="kpi">
+        <span class="kpi__icon kpi__icon--green">🅿️</span>
+        <span class="kpi__title">Celdas libres</span>
+        <span class="kpi__value" id="kpi-available">0</span>
+        <span class="kpi__hint"><b id="kpi-cars">0</b> carros · <b id="kpi-motos">0</b> motos</span>
+      </article>
+      <article class="kpi">
+        <span class="kpi__icon kpi__icon--yellow">💰</span>
+        <span class="kpi__title">Recaudo</span>
+        <span class="kpi__value" id="kpi-revenue">$0</span>
+        <span class="kpi__hint">desde que inició el servicio</span>
+      </article>
+      <article class="kpi">
+        <span class="kpi__icon kpi__icon--violet">🧾</span>
+        <span class="kpi__title">Salidas cobradas</span>
+        <span class="kpi__value" id="kpi-exits">0</span>
+        <span class="kpi__hint">tickets cerrados</span>
+      </article>
+    </section>
+
+    <!-- Operación -->
+    <aside class="panel panel--ops">
+      <section class="card">
+        <header class="card__head">
+          <h2>Registrar ingreso</h2>
+          <span class="chip chip--rpc">RegisterEntry</span>
+        </header>
+        <form id="entry-form" class="form" autocomplete="off">
+          <div class="segmented" role="radiogroup" aria-label="Tipo de vehículo">
+            <label class="segmented__opt">
+              <input type="radio" name="vehicle" value="car" checked />
+              <span>🚗 Carro</span>
+            </label>
+            <label class="segmented__opt">
+              <input type="radio" name="vehicle" value="motorcycle" />
+              <span>🏍️ Moto</span>
+            </label>
+          </div>
+          <label class="plate-field">
+            <span class="plate-field__label">Placa</span>
+            <div class="plate">
+              <input id="entry-plate" class="plate__input" maxlength="7" placeholder="ABC123" spellcheck="false" required />
+              <span class="plate__city">COLOMBIA</span>
+            </div>
+          </label>
+          <button class="btn btn--primary" type="submit">
+            <span class="btn__label">Asignar celda</span>
+            <span class="btn__arrow">→</span>
+          </button>
+        </form>
+      </section>
+
+      <section class="card" id="exit-card">
+        <header class="card__head">
+          <h2>Registrar salida</h2>
+          <span class="chip chip--rpc">RegisterExit</span>
+        </header>
+        <form id="exit-form" class="form" autocomplete="off">
+          <label class="plate-field">
+            <span class="plate-field__label">Placa del vehículo</span>
+            <div class="plate">
+              <input id="exit-plate" class="plate__input" maxlength="7" placeholder="ABC123" spellcheck="false" required />
+              <span class="plate__city">COLOMBIA</span>
+            </div>
+          </label>
+          <p class="form__help">Tip: haz clic en un vehículo del mapa para cargar su placa.</p>
+          <button class="btn btn--danger" type="submit">
+            <span class="btn__label">Cobrar y liberar celda</span>
+            <span class="btn__arrow">→</span>
+          </button>
+        </form>
+      </section>
+
+      <section class="card card--rates">
+        <header class="card__head"><h2>Tarifas</h2></header>
+        <ul class="rates">
+          <li><span>🚗 Carro</span><b>$100</b><small>/ min</small></li>
+          <li><span>🏍️ Moto</span><b>$50</b><small>/ min</small></li>
+        </ul>
+        <p class="form__help">5 min de cortesía · cobro mínimo $1.000 carro / $500 moto. El cálculo real lo hace <code>billing-service</code>.</p>
+      </section>
+    </aside>
+
+    <!-- Mapa -->
+    <section class="panel panel--map card">
+      <header class="card__head">
+        <h2>Mapa del parqueadero</h2>
+        <div class="legend">
+          <span><i class="legend__dot legend__dot--free"></i>Libre</span>
+          <span><i class="legend__dot legend__dot--busy"></i>Ocupada</span>
+          <span class="chip chip--stream">WatchSpots · stream</span>
+        </div>
+      </header>
+
+      <div class="lot">
+        <div class="zone">
+          <h3 class="zone__title">Zona A · Carros</h3>
+          <div class="stalls stalls--top" id="zone-car-top"></div>
+          <div class="lane"><span>➜</span><span>➜</span><span>➜</span></div>
+          <div class="stalls stalls--bottom" id="zone-car-bottom"></div>
+        </div>
+        <div class="zone zone--moto">
+          <h3 class="zone__title">Zona M · Motos</h3>
+          <div class="stalls stalls--moto" id="zone-moto"></div>
+        </div>
+        <div class="gate"><span>ENTRADA ⇄ SALIDA</span></div>
+      </div>
+    </section>
+
+    <!-- Actividad -->
+    <aside class="panel panel--side">
+      <section class="card">
+        <header class="card__head">
+          <h2>Últimos recibos</h2>
+          <span class="chip chip--rpc">ListReceipts</span>
+        </header>
+        <ul class="receipts" id="receipts">
+          <li class="empty">Aún no hay salidas cobradas.</li>
+        </ul>
+      </section>
+
+      <section class="card card--terminal">
+        <header class="card__head">
+          <h2>Inspector gRPC</h2>
+          <span class="chip chip--proto">Protobuf binario</span>
+        </header>
+        <ol class="terminal" id="rpc-log"></ol>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    <span>Microservicios <b>parking-service</b> ⇄ <b>billing-service</b> comunicados por gRPC · Contract-First con <code>.proto</code></span>
+    <span>Programación Orientada a la Web · Universidad Cooperativa de Colombia</span>
+  </footer>
+
+  <!-- Recibo -->
+  <div class="modal" id="receipt-modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <article class="receipt" role="dialog" aria-modal="true" aria-labelledby="receipt-title">
+      <header class="receipt__head">
+        <div class="brand__sign brand__sign--sm">P</div>
+        <div>
+          <h2 id="receipt-title">Recibo de pago</h2>
+          <span id="receipt-ticket">T-0000</span>
+        </div>
+      </header>
+      <div class="receipt__plate" id="receipt-plate">ABC123</div>
+      <dl class="receipt__rows" id="receipt-rows"></dl>
+      <div class="receipt__total">
+        <span>Total a pagar</span>
+        <strong id="receipt-total">$0</strong>
+      </div>
+      <p class="receipt__breakdown" id="receipt-breakdown"></p>
+      <button class="btn btn--primary btn--block" data-close>Listo</button>
+    </article>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>

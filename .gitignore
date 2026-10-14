@@ -1,0 +1,4 @@
+node_modules/
+web/public/app.js
+web/public/app.js.map
+.env

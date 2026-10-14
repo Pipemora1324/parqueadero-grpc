@@ -1,0 +1,62 @@
+// =============================================================================
+// CONTRATO DEL MICROSERVICIO DE FACTURACIÓN (Contract-First)
+// -----------------------------------------------------------------------------
+// Este archivo es la "fuente única de verdad" (SSOT) del servicio de tarifas.
+// A partir de él se genera automáticamente el código TypeScript del servidor
+// y de los clientes (`npm run generate`). Nadie escribe estos tipos a mano.
+// =============================================================================
+syntax = "proto3";
+
+package billing.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Tipos de vehículo que admite el parqueadero.
+enum VehicleType {
+  VEHICLE_TYPE_UNSPECIFIED = 0;
+  VEHICLE_TYPE_CAR = 1;
+  VEHICLE_TYPE_MOTORCYCLE = 2;
+}
+
+// Tarifa vigente para un tipo de vehículo.
+message Rate {
+  VehicleType vehicle_type = 1;
+  // Valor en pesos colombianos (COP) por cada minuto iniciado.
+  uint32 price_per_minute = 2;
+  // Minutos de cortesía que no se cobran.
+  uint32 grace_minutes = 3;
+  // Cobro mínimo cuando se supera el tiempo de cortesía.
+  uint32 minimum_charge = 4;
+}
+
+message CalculateFeeRequest {
+  VehicleType vehicle_type = 1;
+  google.protobuf.Timestamp entered_at = 2;
+  google.protobuf.Timestamp exited_at = 3;
+}
+
+message CalculateFeeResponse {
+  // Minutos reales transcurridos (redondeados hacia arriba).
+  uint32 total_minutes = 1;
+  // Minutos efectivamente cobrados (descontando la cortesía).
+  uint32 billable_minutes = 2;
+  uint32 price_per_minute = 3;
+  // Total a pagar en COP.
+  uint32 total_amount = 4;
+  // Explicación legible del cálculo (se muestra en el recibo).
+  string breakdown = 5;
+}
+
+message GetRatesRequest {}
+
+message GetRatesResponse {
+  repeated Rate rates = 1;
+}
+
+// Servicio interno: lo consume el microservicio de parqueadero vía gRPC.
+service BillingService {
+  // Calcula el valor exacto a pagar entre la entrada y la salida.
+  rpc CalculateFee(CalculateFeeRequest) returns (CalculateFeeResponse);
+  // Devuelve la tabla de tarifas vigente.
+  rpc GetRates(GetRatesRequest) returns (GetRatesResponse);
+}

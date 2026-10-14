@@ -1,0 +1,19 @@
+# Despliegue en Render (plan gratuito) como Blueprint.
+# Un solo contenedor ejecuta los DOS microservicios como procesos separados
+# que se comunican por gRPC: parking-service (público) → billing-service (interno).
+services:
+  - type: web
+    name: parkgrid
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: BILLING_URL
+        value: http://localhost:8081
+      - key: SEED_DEMO_DATA
+        value: "true"
