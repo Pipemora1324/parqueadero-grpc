@@ -8,7 +8,7 @@
     "build": "npm run build:web",
     "start:billing": "tsx src/billing/server.ts",
     "start:parking": "tsx src/parking/server.ts",
-    "dev": "npm run build:web && concurrently --kill-others -n billing,parking -c magenta,cyan \"BILLING_GRPC_PORT=50051 npm run start:billing\" \"GRPC_PORT=50052 npm run start:parking\"",
+    "dev": "npm run build:web && concurrently --kill-others -n billing,parking -c magenta,cyan \"cross-env BILLING_GRPC_PORT=50051 npm run start:billing\" \"cross-env GRPC_PORT=50052 npm run start:parking\"",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test test/*.test.ts",
     "start": "concurrently --kill-others -n billing,parking -c magenta,cyan \"npm run start:billing\" \"npm run start:parking\"",
@@ -21,10 +21,11 @@
     "@connectrpc/connect": "^2.2.0",
     "@connectrpc/connect-node": "^2.2.0",
     "@connectrpc/connect-web": "^2.2.0",
+    "concurrently": "^10.0.6",
+    "cross-env": "^10.1.0",
     "esbuild": "^0.28.2",
     "tsx": "^4.23.15",
-    "zod": "^4.6.7",
-    "concurrently": "^10.0.6"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@bufbuild/buf": "^1.73.0",
